@@ -109,6 +109,7 @@ body {
 	visibility: visible;
 }
 		</style>
+		<script src='coi-serviceworker.js'></script>
 		<link id='-gd-engine-icon' rel='icon' type='image/png' href='index.icon.png' />
 <link rel='apple-touch-icon' href='index.apple-touch-icon.png'/>
 
@@ -237,6 +238,7 @@ const engine = new Engine(GODOT_CONFIG);
 		initializing = false;
 	}
 
+	function startEngine() {
 	const missing = Engine.getMissingFeatures();
 	if (missing.length !== 0) {
 		const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
@@ -262,6 +264,23 @@ const engine = new Engine(GODOT_CONFIG);
 			setStatusMode('hidden');
 			initializing = false;
 		}, displayFailureNotice);
+	}
+	}
+
+	// coi-serviceworker agrega COOP/COEP (GitHub Pages no los manda).
+	// Si todavia no hay aislamiento, espera el recargo del service worker;
+	// si a los 8 s no paso nada (SW no soportado), arranca igual y Godot avisara.
+	if (self.crossOriginIsolated) {
+		startEngine();
+	} else {
+		const notice = document.getElementById('status-notice');
+		if (notice) {
+			notice.style.display = 'block';
+			notice.textContent = 'Preparando el juego...';
+		}
+		setTimeout(() => {
+			if (initializing && !self.crossOriginIsolated) startEngine();
+		}, 8000);
 	}
 }());
 		</script>
