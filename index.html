@@ -135,6 +135,28 @@ body {
 			<div id="status-notice" class="godot" style="display: none;"></div>
 		</div>
 
+			<script>
+// El motor se ensambla en el navegador a partir de sus partes (limite de tamano por archivo en la subida).
+(function(){
+  var N = 12;
+  var orig = window.fetch;
+  window.fetch = function(input, init){
+    var url = (typeof input === "string") ? input : (input && input.url) || "";
+    if (url.indexOf("index.wasm") !== -1 && url.indexOf(".part") === -1){
+      return (async function(){
+        var blobs = [];
+        for (var i = 0; i < N; i++){
+          var r = await orig(url.replace("index.wasm", "index.wasm.part" + i), init);
+          if (!r.ok) throw new Error("Falta la parte " + i + " del juego");
+          blobs.push(await r.arrayBuffer());
+        }
+        return new Response(new Blob(blobs), { status: 200, statusText: "OK", headers: { "Content-Type": "application/wasm" } });
+      })();
+    }
+    return orig.apply(this, arguments);
+  };
+})();
+</script>
 		<script src="index.js"></script>
 		<script>
 const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":8015968,"index.wasm":35708238},"focusCanvas":true,"gdextensionLibs":[]};
