@@ -268,19 +268,54 @@ const engine = new Engine(GODOT_CONFIG);
 	}
 
 	// coi-serviceworker agrega COOP/COEP (GitHub Pages no los manda).
-	// Si todavia no hay aislamiento, espera el recargo del service worker;
-	// si a los 8 s no paso nada (SW no soportado), arranca igual y Godot avisara.
+	// El build usa hilos, asi que sin aislamiento cross-origin el motor no puede arrancar.
 	if (self.crossOriginIsolated) {
 		startEngine();
 	} else {
 		const notice = document.getElementById('status-notice');
-		if (notice) {
-			notice.style.display = 'block';
-			notice.textContent = 'Preparando el juego...';
+		const setMsg = (t) => {
+			if (notice) {
+				notice.textContent = t;
+				notice.style.display = 'block';
+			}
+		};
+		setMsg('Preparando el juego (activando el modo seguro del navegador)...');
+		let listos = false;
+		const recargar = () => {
+			try { sessionStorage.setItem('runCoiRecarga', '1'); } catch (e) {}
+			const sep = location.search ? '&' : '?';
+			location.href = location.pathname + sep + 'coi=' + Date.now() + location.hash;
+		};
+		const arrancar = () => {
+			if (!listos) {
+				listos = true;
+				try { sessionStorage.removeItem('runCoiRecarga'); } catch (e) {}
+				startEngine();
+			}
+		};
+		let yaRecargo = false;
+		try { yaRecargo = sessionStorage.getItem('runCoiRecarga') === '1'; } catch (e) {}
+		// El service worker de coi se registro: esperamos a que controle la pagina
+		// y recargamos una sola vez (con cache-buster) para arrancar ya aislados.
+		if (!yaRecargo && navigator.serviceWorker && !navigator.serviceWorker.controller) {
+			navigator.serviceWorker.ready.then(() => {
+				if (!self.crossOriginIsolated && !listos) recargar();
+			}).catch(() => {});
+			setTimeout(() => {
+				if (!self.crossOriginIsolated && !listos && navigator.serviceWorker && !navigator.serviceWorker.controller) recargar();
+			}, 4000);
 		}
 		setTimeout(() => {
-			if (initializing && !self.crossOriginIsolated) startEngine();
-		}, 8000);
+			if (self.crossOriginIsolated || listos) return;
+			setMsg('Este navegador no pudo activar el modo seguro (service worker) que el juego necesita.\n' +
+				'Probá: recargar la pagina, abrir la web en Chrome, Edge o Firefox actualizado y en ventana normal (no incognito),\n' +
+				'o descargar la version para Android con el boton de abajo a la derecha.');
+			const btn = document.createElement('button');
+			btn.textContent = 'Reintentar';
+			btn.onclick = recargar;
+			btn.style.cssText = 'display:block;margin:14px auto;padding:10px 30px;font-size:18px;cursor:pointer;border-radius:8px;';
+			if (notice && notice.parentNode) notice.parentNode.appendChild(btn);
+		}, 12000);
 	}
 }());
 		</script>
